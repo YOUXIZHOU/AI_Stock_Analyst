@@ -2,6 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from agent.controller import run_agent
 from agent.recommender import run_recommender
+from services.llm import call_claude
 
 st.set_page_config(page_title="AI Stock Analyst", layout="wide")
 st.title("📈 AI Stock Analyst")
@@ -167,3 +168,51 @@ with tab3:
 
         st.subheader("Claude 推薦")
         st.markdown(rec["analysis"])
+
+        st.divider()
+        st.subheader("進一步提問")
+
+        # 快捷提問按鈕
+        QUICK_QUESTIONS = [
+            "我該如何操作？",
+            "這些股票的風險是什麼？",
+            "適合長期持有嗎？",
+            "現在是好的進場時機嗎？",
+        ]
+
+        if "rec_chat" not in st.session_state:
+            st.session_state["rec_chat"] = []
+
+        cols = st.columns(len(QUICK_QUESTIONS))
+        for i, q in enumerate(QUICK_QUESTIONS):
+            if cols[i].button(q, use_container_width=True):
+                st.session_state["rec_pending"] = q
+
+        user_input = st.chat_input("輸入你的問題...")
+        if user_input:
+            st.session_state["rec_pending"] = user_input
+
+        # 處理待送出的問題
+        if "rec_pending" in st.session_state:
+            question = st.session_state.pop("rec_pending")
+            st.session_state["rec_chat"].append({"role": "user", "content": question})
+
+            context = f"""
+以下是剛才的股票推薦結果：
+市場觀點：{rec['sentiment']}
+推薦分析：{rec['analysis']}
+
+使用者問題：{question}
+"""
+            history = st.session_state["rec_chat"][:-1]
+            messages = history + [{"role": "user", "content": context}]
+
+            with st.spinner("思考中..."):
+                reply = call_claude(messages, max_tokens=500, system="你是一位 AI 股票分析師，請用繁體中文簡潔專業地回答使用者關於股票推薦的問題。")
+
+            st.session_state["rec_chat"].append({"role": "assistant", "content": reply})
+
+        # 顯示對話歷史
+        for msg in st.session_state["rec_chat"]:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
