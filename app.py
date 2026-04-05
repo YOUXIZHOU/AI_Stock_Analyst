@@ -13,11 +13,12 @@ tab1, tab2, tab3 = st.tabs(["個股分析", "K 線圖", "股票推薦"])
 # 共用搜尋欄（Tab 1 & Tab 2 共用）
 # ──────────────────────────────────────────
 with tab1:
-    col_input, col_btn = st.columns([3, 1])
-    with col_input:
-        ticker_input = st.text_input("股票代碼", placeholder="例如：NVDA、AAPL", label_visibility="collapsed")
-    with col_btn:
-        search_clicked = st.button("搜尋", use_container_width=True)
+    with st.form("search_form"):
+        col_input, col_btn = st.columns([3, 1])
+        with col_input:
+            ticker_input = st.text_input("股票代碼", placeholder="例如：NVDA、AAPL", label_visibility="collapsed")
+        with col_btn:
+            search_clicked = st.form_submit_button("搜尋", use_container_width=True)
 
     if search_clicked and ticker_input:
         with st.spinner("資料載入中..."):
