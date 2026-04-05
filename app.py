@@ -129,8 +129,22 @@ with tab2:
 # Tab 3 — 股票推薦
 # ──────────────────────────────────────────
 with tab3:
+    from tools.screener import SECTORS
+
     st.subheader("股票推薦")
     st.write("根據技術指標篩選大型股，由 Claude 推薦最值得關注的標的。")
+
+    col_n, col_sector = st.columns(2)
+    with col_n:
+        top_n = st.select_slider(
+            "篩選母體（前 N 大公司）",
+            options=list(range(10, 101, 10)),
+            value=30,
+        )
+    with col_sector:
+        sector_options = ["不限"] + SECTORS
+        selected_sector = st.selectbox("產業篩選", options=sector_options)
+        sector = None if selected_sector == "不限" else selected_sector
 
     col_bull, col_bear = st.columns(2)
     run_bull = col_bull.button("📈 看多推薦", use_container_width=True)
@@ -139,7 +153,7 @@ with tab3:
     if run_bull or run_bear:
         sentiment = "bullish" if run_bull else "bearish"
         with st.spinner("篩選中，約需 20–30 秒..."):
-            rec = run_recommender(sentiment)
+            rec = run_recommender(sentiment, top_n=top_n, sector=sector)
             st.session_state["rec"] = rec
 
     if "rec" in st.session_state:
@@ -148,11 +162,8 @@ with tab3:
 
         if rec["candidates"]:
             st.subheader("篩選結果")
-            st.dataframe(
-                rec["candidates"],
-                use_container_width=True,
-                hide_index=True,
-            )
+            display_candidates = [{k: v for k, v in c.items() if k != "站上MA20"} for c in rec["candidates"]]
+            st.dataframe(display_candidates, use_container_width=True, hide_index=True)
 
         st.subheader("Claude 推薦")
         st.markdown(rec["analysis"])

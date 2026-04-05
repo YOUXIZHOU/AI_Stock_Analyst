@@ -21,7 +21,7 @@ def get_stock_price(ticker: str) -> dict:
         "change_pct": round(change_pct, 2)
     }
 
-def get_ohlcv(ticker: str, period: str = "3mo") -> pd.DataFrame:
+def get_ohlcv(ticker: str, period: str = "1y") -> pd.DataFrame:
     stock = yf.Ticker(ticker)
     df = stock.history(period=period)
 
