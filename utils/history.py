@@ -1,18 +1,16 @@
-import json
 import os
+import json
 from datetime import datetime
+from pathlib import Path
+from supabase import create_client
+from dotenv import load_dotenv
 
-HISTORY_FILE = os.path.join(os.path.dirname(__file__), "..", "history.json")
-MAX_ENTRIES  = 30
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 
-def _load() -> list:
-    if not os.path.exists(HISTORY_FILE):
-        return []
-    try:
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
+def _client():
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY")
+    return create_client(url, key)
 
 class _Encoder(json.JSONEncoder):
     def default(self, obj):
@@ -22,32 +20,44 @@ class _Encoder(json.JSONEncoder):
             return obj.item()
         return super().default(obj)
 
-def _save(entries: list):
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(entries, f, ensure_ascii=False, indent=2, cls=_Encoder)
+def _to_json(obj) -> str:
+    return json.loads(json.dumps(obj, cls=_Encoder))
 
 def save_result(result: dict):
-    entries = _load()
+    ohlcv = (
+        _to_json(result["ohlcv"].reset_index().to_dict(orient="records"))
+        if not result["ohlcv"].empty else []
+    )
 
     entry = {
-        "date":         datetime.now().strftime("%Y-%m-%d"),
-        "ticker":       result["price"]["ticker"],
-        "price":        result["price"],
-        "fundamentals": result["fundamentals"],
-        "news":         result["news"],
-        "tech":         result["tech"],
-        "analysis":     result["analysis"],
-        # ohlcv DataFrame 轉為可序列化格式
-        "ohlcv":        result["ohlcv"].reset_index().to_dict(orient="records")
-                        if not result["ohlcv"].empty else [],
+        "date":          datetime.now().strftime("%Y-%m-%d"),
+        "ticker":        result["price"]["ticker"],
+        "price":         result["price"],
+        "fundamentals":  result["fundamentals"],
+        "news":          result["news"],
+        "tech":          result["tech"],
+        "ohlcv":         ohlcv,
+        "analysis":      result["analysis"],
     }
 
-    # 移除重複（同日同股票）
-    entries = [e for e in entries if not (e["date"] == entry["date"] and e["ticker"] == entry["ticker"])]
-    entries.insert(0, entry)
-    entries = entries[:MAX_ENTRIES]
-
-    _save(entries)
+    try:
+        _client().table("search_history").upsert(
+            entry, on_conflict="date,ticker"
+        ).execute()
+    except Exception as e:
+        print(f"[history] save failed: {e}")
 
 def load_all() -> list:
-    return _load()
+    try:
+        res = (
+            _client()
+            .table("search_history")
+            .select("date, ticker, price, fundamentals, news, tech, ohlcv, analysis")
+            .order("created_at", desc=True)
+            .limit(30)
+            .execute()
+        )
+        return res.data or []
+    except Exception as e:
+        print(f"[history] load failed: {e}")
+        return []

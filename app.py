@@ -58,6 +58,7 @@ with tab1:
             result = run_agent(ticker_input.strip().upper())
             st.session_state["result"] = result
             save_result(result)
+            st.rerun()
 
     if "result" in st.session_state:
         result = st.session_state["result"]
