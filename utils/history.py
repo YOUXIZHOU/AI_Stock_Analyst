@@ -1,20 +1,13 @@
-import os
 import json
+import math
 from datetime import datetime
 from pathlib import Path
-from supabase import create_client
-from dotenv import load_dotenv
 
-load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+HISTORY_FILE = Path(__file__).parent.parent / "history.json"
 
-def _client():
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
-    return create_client(url, key)
-
-import math
 
 class _Encoder(json.JSONEncoder):
+    """處理 Timestamp、numpy 型別及 NaN/Inf"""
     def default(self, obj):
         if hasattr(obj, "isoformat"):
             return obj.isoformat()
@@ -25,54 +18,54 @@ class _Encoder(json.JSONEncoder):
             return v
         return super().default(obj)
 
-    def iterencode(self, obj, _one_shot=False):
-        # 攔截所有 float nan/inf
+    def encode(self, obj):
         if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
-            yield "null"
-            return
-        yield from super().iterencode(obj, _one_shot)
+            return "null"
+        return super().encode(obj)
+
 
 def _to_json(obj):
-    return json.loads(json.dumps(obj, cls=_Encoder))
+    raw = json.dumps(obj, cls=_Encoder)
+    return json.loads(raw)
+
 
 def save_result(result: dict):
     if "error" in result.get("price", {}):
         return
 
-    ohlcv = (
-        _to_json(result["ohlcv"].reset_index().to_dict(orient="records"))
-        if not result["ohlcv"].empty else []
-    )
+    ohlcv = []
+    if not result["ohlcv"].empty:
+        ohlcv = _to_json(
+            result["ohlcv"].reset_index().to_dict(orient="records")
+        )
 
     entry = {
-        "date":          datetime.now().strftime("%Y-%m-%d"),
-        "ticker":        result["price"]["ticker"],
-        "price":         result["price"],
-        "fundamentals":  result["fundamentals"],
-        "news":          result["news"],
-        "tech":          result["tech"],
-        "ohlcv":         ohlcv,
-        "analysis":      result["analysis"],
+        "date":         datetime.now().strftime("%Y-%m-%d"),
+        "ticker":       result["price"]["ticker"],
+        "price":        result["price"],
+        "fundamentals": result["fundamentals"],
+        "news":         result["news"],
+        "tech":         _to_json(result["tech"]),
+        "ohlcv":        ohlcv,
+        "analysis":     result["analysis"],
     }
 
-    try:
-        _client().table("search_history").upsert(
-            entry, on_conflict="date,ticker"
-        ).execute()
-    except Exception as e:
-        print(f"[history] save failed: {e}")
+    history = load_all()
+
+    # 同一天同一股票只保留最新一筆
+    history = [h for h in history if not (h["date"] == entry["date"] and h["ticker"] == entry["ticker"])]
+    history.insert(0, entry)
+    history = history[:30]  # 最多保留 30 筆
+
+    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
+
 
 def load_all() -> list:
+    if not HISTORY_FILE.exists():
+        return []
     try:
-        res = (
-            _client()
-            .table("search_history")
-            .select("date, ticker, price, fundamentals, news, tech, ohlcv, analysis")
-            .order("created_at", desc=True)
-            .limit(30)
-            .execute()
-        )
-        return res.data or []
-    except Exception as e:
-        print(f"[history] load failed: {e}")
+        with open(HISTORY_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
         return []

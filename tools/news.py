@@ -2,10 +2,10 @@ import time
 import yfinance as yf
 from datetime import datetime
 
-def get_news(stock: yf.Ticker) -> list:
+def get_news(ticker: str) -> list:
     for attempt in range(3):
         try:
-            raw_news = stock.news or []
+            raw_news = yf.Ticker(ticker).news or []
             if raw_news:
                 break
         except Exception:

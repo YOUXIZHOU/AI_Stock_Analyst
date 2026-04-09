@@ -2,10 +2,10 @@ import time
 import yfinance as yf
 import pandas as pd
 
-def _fetch_history(stock: yf.Ticker, period: str, retries: int = 3) -> pd.DataFrame:
+def _fetch_history(ticker: str, period: str, retries: int = 3) -> pd.DataFrame:
     for attempt in range(retries):
         try:
-            df = stock.history(period=period)
+            df = yf.Ticker(ticker).history(period=period)
             if not df.empty:
                 return df
         except Exception:
@@ -14,8 +14,8 @@ def _fetch_history(stock: yf.Ticker, period: str, retries: int = 3) -> pd.DataFr
             time.sleep(2 ** attempt)
     return pd.DataFrame()
 
-def get_stock_price(stock: yf.Ticker, ticker: str) -> dict:
-    hist = _fetch_history(stock, period="5d")
+def get_stock_price(ticker: str) -> dict:
+    hist = _fetch_history(ticker, period="5d")
 
     if hist.empty:
         return {"error": "No data found"}
@@ -32,8 +32,8 @@ def get_stock_price(stock: yf.Ticker, ticker: str) -> dict:
         "change_pct":   round(change_pct, 2)
     }
 
-def get_ohlcv(stock: yf.Ticker, period: str = "1y") -> pd.DataFrame:
-    df = _fetch_history(stock, period=period)
+def get_ohlcv(ticker: str, period: str = "1y") -> pd.DataFrame:
+    df = _fetch_history(ticker, period=period)
 
     if df.empty:
         return pd.DataFrame()
