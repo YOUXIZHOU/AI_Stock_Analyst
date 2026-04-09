@@ -14,9 +14,17 @@ def _load() -> list:
     except Exception:
         return []
 
+class _Encoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj, "isoformat"):
+            return obj.isoformat()
+        if hasattr(obj, "item"):
+            return obj.item()
+        return super().default(obj)
+
 def _save(entries: list):
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(entries, f, ensure_ascii=False, indent=2)
+        json.dump(entries, f, ensure_ascii=False, indent=2, cls=_Encoder)
 
 def save_result(result: dict):
     entries = _load()
