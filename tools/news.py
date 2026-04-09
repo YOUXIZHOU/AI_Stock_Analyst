@@ -1,9 +1,16 @@
+import time
 import yfinance as yf
 from datetime import datetime
 
 def get_news(ticker: str) -> list:
-    stock = yf.Ticker(ticker)
-    raw_news = stock.news or []
+    for attempt in range(3):
+        try:
+            raw_news = yf.Ticker(ticker).news or []
+            break
+        except Exception:
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+            raw_news = []
 
     results = []
     for item in raw_news[:5]:

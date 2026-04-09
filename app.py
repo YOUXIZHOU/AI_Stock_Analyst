@@ -1,16 +1,49 @@
+import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 from agent.controller import run_agent
 from agent.recommender import run_recommender
 from services.llm import call_claude
+from utils.history import save_result, load_all
 
 st.set_page_config(page_title="AI Stock Analyst", layout="wide")
 st.title("📈 AI Stock Analyst")
 
+# ──────────────────────────────────────────
+# Sidebar — 查詢歷史
+# ──────────────────────────────────────────
+with st.sidebar:
+    st.header("查詢歷史")
+    history = load_all()
+
+    if not history:
+        st.write("尚無查詢記錄")
+    else:
+        for entry in history:
+            label = f"{entry['date']} | {entry['ticker']}"
+            if st.button(label, use_container_width=True, key=label):
+                ohlcv_df = pd.DataFrame(entry["ohlcv"])
+                if not ohlcv_df.empty and "Datetime" in ohlcv_df.columns:
+                    ohlcv_df = ohlcv_df.set_index("Datetime")
+                elif not ohlcv_df.empty and "Date" in ohlcv_df.columns:
+                    ohlcv_df = ohlcv_df.set_index("Date")
+
+                st.session_state["result"] = {
+                    "price":        entry["price"],
+                    "fundamentals": entry["fundamentals"],
+                    "news":         entry["news"],
+                    "tech":         entry["tech"],
+                    "analysis":     entry["analysis"],
+                    "ohlcv":        ohlcv_df,
+                }
+
+# ──────────────────────────────────────────
+# Tabs
+# ──────────────────────────────────────────
 tab1, tab2, tab3 = st.tabs(["個股分析", "K 線圖", "股票推薦"])
 
 # ──────────────────────────────────────────
-# 共用搜尋欄（Tab 1 & Tab 2 共用）
+# Tab 1 — 個股分析
 # ──────────────────────────────────────────
 with tab1:
     with st.form("search_form"):
@@ -24,6 +57,7 @@ with tab1:
         with st.spinner("資料載入中..."):
             result = run_agent(ticker_input.strip().upper())
             st.session_state["result"] = result
+            save_result(result)
 
     if "result" in st.session_state:
         result = st.session_state["result"]
@@ -43,13 +77,13 @@ with tab1:
         # ── 基本面區塊 ──
         st.subheader("公司基本面")
         f1, f2, f3 = st.columns(3)
-        f1.metric("市值",         fund.get("市值", "—"))
-        f1.metric("本益比 (PE)",   str(fund.get("本益比(PE)", "—")))
+        f1.metric("市值",           fund.get("市值", "—"))
+        f1.metric("本益比 (PE)",    str(fund.get("本益比(PE)", "—")))
         f2.metric("每股盈餘 (EPS)", str(fund.get("每股盈餘(EPS)", "—")))
-        f2.metric("營收年增率",    fund.get("營收年增率", "—"))
-        f3.metric("淨利率",        fund.get("淨利率", "—"))
-        f3.metric("負債比 (D/E)",  str(fund.get("負債比(D/E)", "—")))
-        st.metric("自由現金流",    fund.get("自由現金流", "—"))
+        f2.metric("營收年增率",     fund.get("營收年增率", "—"))
+        f3.metric("淨利率",         fund.get("淨利率", "—"))
+        f3.metric("負債比 (D/E)",   str(fund.get("負債比(D/E)", "—")))
+        st.metric("自由現金流",     fund.get("自由現金流", "—"))
 
         st.divider()
 
@@ -81,7 +115,6 @@ with tab2:
 
         st.subheader(f"{ticker} K 線圖")
 
-        # 疊加指標選擇
         col_ma, col_bb = st.columns(2)
         with col_ma:
             show_ma5  = st.checkbox("MA5",  value=True)
@@ -92,7 +125,6 @@ with tab2:
 
         fig = go.Figure()
 
-        # K 線
         fig.add_trace(go.Candlestick(
             x=df.index,
             open=df["Open"], high=df["High"],
@@ -102,15 +134,13 @@ with tab2:
             decreasing_line_color="#26a69a",
         ))
 
-        # 均線
-        if show_ma5 and "MA5" in df.columns:
+        if show_ma5  and "MA5"  in df.columns:
             fig.add_trace(go.Scatter(x=df.index, y=df["MA5"],  name="MA5",  line=dict(color="#ff9800", width=1)))
         if show_ma20 and "MA20" in df.columns:
             fig.add_trace(go.Scatter(x=df.index, y=df["MA20"], name="MA20", line=dict(color="#2196f3", width=1)))
         if show_ma60 and "MA60" in df.columns:
             fig.add_trace(go.Scatter(x=df.index, y=df["MA60"], name="MA60", line=dict(color="#9c27b0", width=1)))
 
-        # 布林通道
         if show_bb and "BB_upper" in df.columns:
             fig.add_trace(go.Scatter(x=df.index, y=df["BB_upper"], name="布林上緣", line=dict(color="#78909c", width=1, dash="dash")))
             fig.add_trace(go.Scatter(x=df.index, y=df["BB_mid"],   name="布林中線", line=dict(color="#78909c", width=1)))
@@ -173,7 +203,6 @@ with tab3:
         st.divider()
         st.subheader("進一步提問")
 
-        # 快捷提問按鈕
         QUICK_QUESTIONS = [
             "我該如何操作？",
             "這些股票的風險是什麼？",
@@ -193,7 +222,6 @@ with tab3:
         if user_input:
             st.session_state["rec_pending"] = user_input
 
-        # 處理待送出的問題
         if "rec_pending" in st.session_state:
             question = st.session_state.pop("rec_pending")
             st.session_state["rec_chat"].append({"role": "user", "content": question})
@@ -205,15 +233,14 @@ with tab3:
 
 使用者問題：{question}
 """
-            history = st.session_state["rec_chat"][:-1]
-            messages = history + [{"role": "user", "content": context}]
+            history_chat = st.session_state["rec_chat"][:-1]
+            messages = history_chat + [{"role": "user", "content": context}]
 
             with st.spinner("思考中..."):
                 reply = call_claude(messages, max_tokens=500, system="你是一位 AI 股票分析師，請用繁體中文簡潔專業地回答使用者關於股票推薦的問題。")
 
             st.session_state["rec_chat"].append({"role": "assistant", "content": reply})
 
-        # 顯示對話歷史
         for msg in st.session_state["rec_chat"]:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])

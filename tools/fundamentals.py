@@ -1,7 +1,16 @@
+import time
 import yfinance as yf
 
 def get_fundamentals(ticker: str) -> dict:
-    info = yf.Ticker(ticker).info
+    for attempt in range(3):
+        try:
+            info = yf.Ticker(ticker).info
+            break
+        except Exception:
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+            info = {}
+
 
     if not info:
         return {"error": "No data found"}

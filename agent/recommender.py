@@ -13,7 +13,7 @@ RECOMMEND_PROMPT = """
 - 最後補充一句整體市場情緒的簡短看法
 """
 
-def run_recommender(sentiment: str, top_n: int = 30, sector: str = None) -> dict:
+def run_recommender(sentiment: str, top_n: int = 30, sector: str | None = None) -> dict:
     """
     sentiment: "bullish"（看多）或 "bearish"（看空）
     top_n    : 從前 N 大公司篩選
