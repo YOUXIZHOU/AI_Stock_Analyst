@@ -24,6 +24,9 @@ def _to_json(obj) -> str:
     return json.loads(json.dumps(obj, cls=_Encoder))
 
 def save_result(result: dict):
+    if "error" in result.get("price", {}):
+        return
+
     ohlcv = (
         _to_json(result["ohlcv"].reset_index().to_dict(orient="records"))
         if not result["ohlcv"].empty else []
