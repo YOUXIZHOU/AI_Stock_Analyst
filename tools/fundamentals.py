@@ -1,11 +1,11 @@
 import time
 import yfinance as yf
 
-def get_fundamentals(ticker: str) -> dict:
+def get_fundamentals(stock: yf.Ticker) -> dict:
     info = {}
     for attempt in range(3):
         try:
-            data = yf.Ticker(ticker).info
+            data = stock.info
             if data and len(data) > 5:
                 info = data
                 break

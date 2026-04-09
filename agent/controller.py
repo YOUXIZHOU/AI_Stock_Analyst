@@ -1,3 +1,4 @@
+import yfinance as yf
 from services.llm import call_claude
 from tools.stock import get_stock_price, get_ohlcv
 from tools.news import get_news
@@ -70,12 +71,13 @@ def _build_tech_summary(ohlcv_df) -> dict:
 
 def run_agent(ticker: str) -> dict:
     ticker = ticker.strip().upper()
+    stock  = yf.Ticker(ticker)
 
-    # Step 1: 執行所有工具
-    price_data        = get_stock_price(ticker)
-    fundamentals_data = get_fundamentals(ticker)
-    news_data         = get_news(ticker)
-    ohlcv_df          = get_ohlcv(ticker)
+    # Step 1: 共用同一個 Ticker 物件，減少連線次數
+    price_data        = get_stock_price(stock, ticker)
+    fundamentals_data = get_fundamentals(stock)
+    news_data         = get_news(stock)
+    ohlcv_df          = get_ohlcv(stock)
     tech_data         = _build_tech_summary(ohlcv_df)
 
     # Step 2: Claude 只負責分析
@@ -101,7 +103,7 @@ def run_agent(ticker: str) -> dict:
         }
     ]
 
-    analysis = call_claude(prompt, max_tokens=1500, system=SYSTEM_PROMPT)
+    analysis = call_claude(prompt, max_tokens=2000, system=SYSTEM_PROMPT)
 
     return {
         "price":        price_data,
