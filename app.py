@@ -21,7 +21,7 @@ with st.sidebar:
     else:
         for entry in history:
             label = f"{entry['date']} | {entry['ticker']}"
-            if st.button(label, use_container_width=True, key=label):
+            if st.button(label, width='stretch', key=label):
                 ohlcv_df = pd.DataFrame(entry["ohlcv"])
                 if not ohlcv_df.empty and "Datetime" in ohlcv_df.columns:
                     ohlcv_df = ohlcv_df.set_index("Datetime")
@@ -51,7 +51,7 @@ with tab1:
         with col_input:
             ticker_input = st.text_input("股票代碼", placeholder="例如：NVDA、AAPL", label_visibility="collapsed")
         with col_btn:
-            search_clicked = st.form_submit_button("搜尋", use_container_width=True)
+            search_clicked = st.form_submit_button("搜尋", width='stretch')
 
     if search_clicked and ticker_input:
         with st.spinner("資料載入中..."):
@@ -160,7 +160,7 @@ with tab2:
             margin=dict(l=20, r=20, t=40, b=20),
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 # ──────────────────────────────────────────
 # Tab 3 — 股票推薦
@@ -184,8 +184,8 @@ with tab3:
         sector = None if selected_sector == "不限" else selected_sector
 
     col_bull, col_bear = st.columns(2)
-    run_bull = col_bull.button("📈 看多推薦", use_container_width=True)
-    run_bear = col_bear.button("📉 看空推薦", use_container_width=True)
+    run_bull = col_bull.button("📈 看多推薦", width='stretch')
+    run_bear = col_bear.button("📉 看空推薦", width='stretch')
 
     if run_bull or run_bear:
         sentiment = "bullish" if run_bull else "bearish"
@@ -200,7 +200,7 @@ with tab3:
         if rec["candidates"]:
             st.subheader("篩選結果")
             display_candidates = [{k: v for k, v in c.items() if k != "站上MA20"} for c in rec["candidates"]]
-            st.dataframe(display_candidates, use_container_width=True, hide_index=True)
+            st.dataframe(display_candidates, width='stretch', hide_index=True)
 
         st.subheader("Claude 推薦")
         st.markdown(rec["analysis"])
@@ -220,7 +220,7 @@ with tab3:
 
         cols = st.columns(len(QUICK_QUESTIONS))
         for i, q in enumerate(QUICK_QUESTIONS):
-            if cols[i].button(q, use_container_width=True):
+            if cols[i].button(q, width='stretch'):
                 st.session_state["rec_pending"] = q
 
         user_input = st.chat_input("輸入你的問題...")
