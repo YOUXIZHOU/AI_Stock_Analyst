@@ -31,7 +31,7 @@ def get_fundamentals(stock: yf.Ticker) -> dict:
 
     return {
         "公司名稱":       info.get("longName", "無資料"),
-        "產業":           info.get("sector", "無資料"),
+        "產業":           info.get("sector",   "無資料"),
         "市值":           fmt_billion(info.get("marketCap")),
         "本益比(PE)":     fmt_val(info.get("trailingPE")),
         "每股盈餘(EPS)":  fmt_val(info.get("trailingEps")),
