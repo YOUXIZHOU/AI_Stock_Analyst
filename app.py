@@ -66,6 +66,10 @@ with tab1:
         fund   = result["fundamentals"]
         news   = result["news"]
 
+        if "error" in price:
+            st.error("無法取得股票資料，請確認代碼是否正確，或稍後再試。")
+            st.stop()
+
         # ── 股價區塊 ──
         st.subheader(f"{fund.get('公司名稱', price['ticker'])}（{price['ticker']}）")
         c1, c2, c3 = st.columns(3)
